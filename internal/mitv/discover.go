@@ -3,6 +3,7 @@ package mitv
 import (
 	"errors"
 	"net"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -16,11 +17,21 @@ var ErrNotFound = errors.New("mitv: no device found")
 // (The device answers mDNS only by multicast to port 5353, which the
 // system's own responder holds, so a scan is the portable way.)
 func Discover() (string, error) {
+	all := DiscoverAll()
+	if len(all) == 0 {
+		return "", ErrNotFound
+	}
+	return all[0], nil
+}
+
+// DiscoverAll returns every HyperOS display on the local network, or the
+// other answering devices when none of them is a display. Addresses are sorted.
+func DiscoverAll() []string {
 	var (
-		mu      sync.Mutex
-		display string
-		other   string
-		wg      sync.WaitGroup
+		mu       sync.Mutex
+		displays []string
+		others   []string
+		wg       sync.WaitGroup
 	)
 	for _, host := range candidates() {
 		wg.Add(1)
@@ -38,20 +49,18 @@ func Discover() (string, error) {
 			mu.Lock()
 			defer mu.Unlock()
 			if strings.Contains(name, "显示器") || strings.Contains(strings.ToLower(name), "monitor") {
-				display = host
-			} else if other == "" {
-				other = host
+				displays = append(displays, host)
+			} else {
+				others = append(others, host)
 			}
 		}()
 	}
 	wg.Wait()
-	switch {
-	case display != "":
-		return display, nil
-	case other != "":
-		return other, nil
+	if len(displays) == 0 {
+		displays = others
 	}
-	return "", ErrNotFound
+	slices.Sort(displays)
+	return displays
 }
 
 // candidates lists the other addresses of each private IPv4 /24 we are on.

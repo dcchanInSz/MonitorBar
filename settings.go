@@ -6,13 +6,25 @@ import (
 	"path/filepath"
 )
 
+// monitorSettings are one display's picture choices, keyed by Monitor.ID.
+type monitorSettings struct {
+	SoftBrightness float64 `json:"softBrightness"`
+	Warmth         float64 `json:"warmth"`
+	NetworkHost    string  `json:"networkHost,omitempty"`
+}
+
 // settings are the choices kept between launches, in a JSON file.
+// SoftBrightness, Warmth and NetworkHost mirror the selected display, so a
+// settings file from before per-display settings still loads.
 type settings struct {
 	SoftBrightness float64 `json:"softBrightness"` // gamma %, 20...100
 	Warmth         float64 `json:"warmth"`         // 0...100
 	Tab            string  `json:"tab"`
 	NetworkHost    string  `json:"networkHost"` // the display found last time
 	LaunchedBefore bool    `json:"launchedBefore"`
+
+	Selected string                     `json:"selected,omitempty"`
+	Monitors map[string]monitorSettings `json:"monitors,omitempty"`
 
 	// Switching to the day and night scenes at set times.
 	AutoSwitch bool   `json:"autoSwitch"`
@@ -22,6 +34,14 @@ type settings struct {
 	NightScene string `json:"nightScene"`
 	AutoPeriod string `json:"autoPeriod"` // the period whose scene was applied last
 	path       string
+}
+
+// hostFor is the LAN address remembered for a display.
+func (p *settings) hostFor(id string) string {
+	if p == nil || p.Monitors == nil {
+		return ""
+	}
+	return p.Monitors[id].NetworkHost
 }
 
 // dataDir is where MonitorBar keeps its files.
